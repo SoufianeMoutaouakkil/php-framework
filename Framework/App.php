@@ -56,11 +56,8 @@ class App
             $classPath = ROOT_PATH . "/$class.php";
             $classPath = str_replace("\\", "/", $classPath);
             if (file_exists($classPath)) {
-                echo "$class_name found in $classPath. Loading...<br>";
                 require_once $classPath;
-                return;
             }
-            die("Class not found: $class_name in $classPath.");
         });
     }
 
