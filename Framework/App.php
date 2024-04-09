@@ -6,7 +6,10 @@ namespace Framework;
 
 use Exception;
 use ReflectionMethod;
+use Framework\Http\Request;
 use Framework\Config\Config;
+use Framework\Http\Response;
+use Framework\Router\Router;
 use UnexpectedValueException;
 use Framework\Exceptions\PageNotFoundException;
 
@@ -36,7 +39,6 @@ class App
         $this->initAutoload();
         $this->initConfig();
         $this->initErrorHandler();
-        throw new Exception("Error Processing Request");
         $this->initRequest();
         $this->initRouter();
     }
@@ -85,9 +87,9 @@ class App
 
     public function run()
     {
-        $path = $this->getPath($request->uri);
+        $this->router->match($this->request);
 
-        $params = $this->router->match($path, $request->method);
+        var_dump($this->request);die;
 
         if ($params === false) {
 

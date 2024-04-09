@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Framework;
+namespace Framework\Http;
 
 class Response
 {
@@ -10,26 +10,33 @@ class Response
 
     private array $headers = [];
 
-    private int $status_code = 0;
+    private int $statusCode = 0;
 
     public function setStatusCode(int $code): void
     {
-        $this->status_code = $code;
+        $this->statusCode = $code;
     }
     
     public function redirect(string $url): void
     {
-        $this->addHeader("Location: $url");
+        $this->addHeader("Location", $url);
     }
 
-    public function addHeader(string $header): void
+    public function addHeader(string $header, mixed $value, bool $replace = true): void
     {
-        $this->headers[] = $header;
+        if ($replace || !isset($this->headers[$header])) {
+            $this->headers[$header] = $value;
+        }
     }
 
     public function setBody(string $body): void
     {
         $this->body = $body;
+    }
+
+    public function appendBody(string $body): void
+    {
+        $this->body .= $body;
     }
     
     public function getBody(): string
@@ -39,16 +46,29 @@ class Response
 
     public function send(): void
     {
-        if ($this->status_code) {
-        
-            http_response_code($this->status_code);
-        }
-
-        foreach ($this->headers as $header) {
-
-            header($header);
-        }
-
+        $this->setStatusCodeHeader();
+        $this->setHeaders();
         echo $this->body;
+    }
+
+    public function json(array $data): void
+    {
+        $this->addHeader("Content-Type", "application/json");
+        $this->setBody(json_encode($data));
+        $this->send();
+    }
+
+    private function setHeaders(): void
+    {
+        foreach ($this->headers as $header => $value) {
+            header("$header: $value");
+        }
+    }
+
+    private function setStatusCodeHeader(): void
+    {
+        if ($this->statusCode) {
+            http_response_code($this->statusCode);
+        }
     }
 }

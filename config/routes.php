@@ -1,9 +1,12 @@
 <?php
 
 return [
-    [
-        'method|all',
-        'path|*',
-        ["params"]
-    ]
+    "create_user" => [
+        "path" => "/users",
+        "controller" => "App\Controllers\UserController::create",
+        "methods" => ["POST", "GET"], // optional
+        "options" => [
+            "middleware" => ["auth"]
+        ]
+    ],
 ];
