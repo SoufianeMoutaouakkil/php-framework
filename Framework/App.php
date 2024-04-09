@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Framework;
 
+use Exception;
 use ReflectionMethod;
 use Framework\Config\Config;
 use UnexpectedValueException;
@@ -24,7 +25,7 @@ class App
             define("ROOT_PATH", dirname(__DIR__));
         }
         if (!defined("CONFIG_PATH")) {
-            define("CONFIG_PATH", dirname(__DIR__) ."/config");
+            define("CONFIG_PATH", dirname(__DIR__) . "/config");
         }
 
         $this->init();
@@ -32,17 +33,47 @@ class App
 
     public function init()
     {
+        $this->initAutoload();
         $this->initConfig();
+        $this->initErrorHandler();
+        throw new Exception("Error Processing Request");
         $this->initRequest();
         $this->initRouter();
+    }
+
+
+    private function initAutoload()
+    {
+        spl_autoload_register(function (string $class_name) {
+            $namespace = explode("\\", $class_name)[0];
+
+            $class = $class_name;
+            if ($namespace === "App") {
+                $class = str_replace("App\\", "src/", $class_name);
+                $class = str_replace("\\", "/", $class);
+            }
+
+            $classPath = ROOT_PATH . "/$class.php";
+            $classPath = str_replace("\\", "/", $classPath);
+            if (file_exists($classPath)) {
+                echo "$class_name found in $classPath. Loading...<br>";
+                require_once $classPath;
+                return;
+            }
+            die("Class not found: $class_name in $classPath.");
+        });
+    }
+
+    private function initErrorHandler()
+    {
+        set_error_handler("Framework\Error\ErrorHandler::handleError");
+        set_exception_handler("Framework\Error\ErrorHandler::handleException");
     }
 
     private function initConfig()
     {
         $this->config = Config::getInstance();
         $this->config->init();
-        $config = $this->config->get();
-        var_dump($config);die;
     }
 
     private function initRequest()
@@ -55,7 +86,7 @@ class App
         $this->router = new Router($this->config->get("routes", []));
     }
 
-    public function run(): void
+    public function run()
     {
         $path = $this->getPath($request->uri);
 

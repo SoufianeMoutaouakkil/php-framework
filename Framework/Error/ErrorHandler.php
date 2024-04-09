@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Framework;
+namespace Framework\Error;
 
 use ErrorException;
 use Throwable;
@@ -40,11 +40,11 @@ class ErrorHandler
     
         }
     
-        if ($_ENV["SHOW_ERRORS"]) {
-    
+        if (isset($_ENV["SHOW_ERRORS"]) && $_ENV["SHOW_ERRORS"]) {
+            die($exception->getMessage());
             ini_set("display_errors", "1");
-    
         } else {
+            die("An error occurred. Please try again later.");
     
             ini_set("display_errors", "0");
     

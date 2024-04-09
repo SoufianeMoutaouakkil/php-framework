@@ -123,15 +123,15 @@ class Config
     {
         if (is_null($key)) {
             if (is_array($config)) {
-                self::$config = [
-                    ...self::$config,
+                $this->config = [
+                    ...$this->config,
                     ...$config
                 ];
             } else {
                 throw new ConfigException("Config withou key must be an array");
             }
         } else {
-            self::$config[$key] = $config;
+            $this->config[$key] = $config;
         }
     }
 }
