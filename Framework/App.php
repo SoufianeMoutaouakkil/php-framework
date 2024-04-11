@@ -89,7 +89,7 @@ class App
     {
         $this->router->match($this->request);
 
-        var_dump($this->request);die;
+        var_dump($this->request->attributes->all());die;
 
         if ($params === false) {
 

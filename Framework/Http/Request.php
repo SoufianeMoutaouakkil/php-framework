@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Framework\Http;
 
+use UnexpectedValueException;
+
 class Request
 {
     const METHOD_GET = "get";
@@ -14,7 +16,7 @@ class Request
     const METHOD_OPTIONS = "options";
     const METHOD_HEAD = "head";
 
-    protected Attributes $attributes;
+    public Attributes $attributes;
     public function __construct(
         public string $uri,
         public string $method,
@@ -50,6 +52,18 @@ class Request
     public function getUri(): string
     {
         return $this->uri;
+    }
+
+    public function getPath(): string
+    {
+        $path = parse_url($this->uri, PHP_URL_PATH);
+        if ($path === false) {
+            throw new UnexpectedValueException("Malformed URL: '$this->uri'");
+        }
+        if ($path === "/") {
+            return "/";
+        }
+        return rtrim(parse_url($this->uri, PHP_URL_PATH), "/");
     }
 
     public function getMethod(): string

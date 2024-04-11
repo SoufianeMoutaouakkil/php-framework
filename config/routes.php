@@ -9,4 +9,15 @@ return [
             "middleware" => ["auth"]
         ]
     ],
+    "get_user" => [
+        "path" => "/users/{id}",
+        "controller" => "App\Controllers\UserController::get",
+        "options" => [
+            "middleware" => ["auth"]
+        ]
+    ],
+    "home" => [
+        "path" => "/",
+        "controller" => "App\Controllers\HomeController::index"
+    ]
 ];

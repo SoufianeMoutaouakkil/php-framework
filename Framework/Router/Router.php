@@ -13,7 +13,7 @@ class Router
     {
     }
 
-    public function add(string $name, string $path, string $controller, array|string $methods, array $options = []): void
+    public function add(string $name, string $path, string $controller, array|string $methods = [], array $options = []): void
     {
         if (is_string($methods)) {
             $methods = [$methods];
@@ -79,40 +79,49 @@ class Router
     public function match(
         Request $request
     ): void {
-        $path = $request->getU
+        $path = $request->getPath();
+        $method = $request->getMethod();
 
-        $path = trim($path, "/");
+        foreach ($this->routes as $routeName => $route) {
+            // validate method
+            if (!empty($route["methods"])) {
+                $methods = array_filter(
+                    $route["methods"],
+                    function ($m) use ($method) {
+                        return strtolower($m) === strtolower($method);
+                    }
+                );
+                if (empty($methods)) {
+                    continue;
+                }
+            }
 
-        foreach ($this->routes as $route) {
-
-            $pattern = $this->getPatternFromRoutePath($route["path"]);
-
+           $pattern = $this->getPatternFromRoutePath($route["path"]);
+            // if ($routeName === "home") {
+            //     var_dump($pattern);
+            //     var_dump($path);
+            //     var_dump($method);
+            //     die;
+            // }
             if (preg_match($pattern, $path, $matches)) {
 
                 $matches = array_filter($matches, "is_string", ARRAY_FILTER_USE_KEY);
-
-                $params = array_merge($matches, $route["params"]);
-
-                if (array_key_exists("method", $params)) {
-
-                    if (strtolower($method) !== strtolower($params["method"])) {
-
-                        continue;
-                    }
+                if (!empty($route["options"])) {
+                    $options = array_merge($matches, $route["options"]);
+                } else {
+                    $options = $matches;
                 }
-
-                return $params;
+                $request->attributes->set("_route", $routeName);
+                $request->attributes->set("_route_params", $options);
+                $request->attributes->set("_controller", $route["controller"]);
             }
         }
-
-        return false;
     }
 
-    private function getPatternFromRoutePath(string $route_path): string
+    private function getPatternFromRoutePath(string $routePath): string
     {
-        $route_path = trim($route_path, "/");
 
-        $segments = explode("/", $route_path);
+        $segments = explode("/", trim($routePath));
 
         $segments = array_map(function (string $segment): string {
 
