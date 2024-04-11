@@ -44,18 +44,17 @@ class Response
         return $this->body;
     }
 
+    public function json(array $data): void
+    {
+        $this->addHeader("Content-Type", "application/json");
+        $this->setBody(json_encode($data));
+    }
+
     public function send(): void
     {
         $this->setStatusCodeHeader();
         $this->setHeaders();
         echo $this->body;
-    }
-
-    public function json(array $data): void
-    {
-        $this->addHeader("Content-Type", "application/json");
-        $this->setBody(json_encode($data));
-        $this->send();
     }
 
     private function setHeaders(): void

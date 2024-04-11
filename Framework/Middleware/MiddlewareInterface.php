@@ -1,6 +1,10 @@
 <?php
 
-namespace Framework;
+namespace Framework\Middleware;
+
+use Framework\Http\Request;
+use Framework\Http\Response;
+use Framework\Http\RequestHandlerInterface;
 
 interface MiddlewareInterface
 {

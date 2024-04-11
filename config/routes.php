@@ -13,7 +13,7 @@ return [
         "path" => "/users/{id}",
         "controller" => "App\Controllers\UserController::get",
         "options" => [
-            "middleware" => ["auth"]
+            "middlewares" => ["example"]
         ]
     ],
     "home" => [

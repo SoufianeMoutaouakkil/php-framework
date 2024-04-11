@@ -4,23 +4,27 @@ declare(strict_types=1);
 
 namespace Framework;
 
-use Exception;
 use ReflectionMethod;
 use Framework\Http\Request;
+
 use Framework\Config\Config;
 use Framework\Http\Response;
 use Framework\Router\Router;
 use UnexpectedValueException;
+use Framework\Service\Container;
+use Framework\View\TemplateViewerInterface;
 use Framework\Exceptions\PageNotFoundException;
+use Framework\Controller\ControllerRequestHandler;
+use Framework\Middleware\MiddlewareRequestHandler;
 
 class App
 {
-    private Router $router;
-    private Request $request;
-    private Response $response;
-    private Config $config;
-
-    private Container $container;
+    protected Router $router;
+    protected Request $request;
+    protected Response $response;
+    protected Config $config;
+    protected Container $container;
+    protected array $middlewareClasses;
 
     public function __construct()
     {
@@ -40,6 +44,9 @@ class App
         $this->initConfig();
         $this->initErrorHandler();
         $this->initRequest();
+        $this->initResponse();
+        $this->initContainer();
+        $this->initMiddlewares();
         $this->initRouter();
     }
 
@@ -80,6 +87,31 @@ class App
         $this->request = Request::createFromGlobals();
     }
 
+    private function initResponse()
+    {
+        $this->response = new Response();
+    }
+
+    private function initContainer()
+    {
+        $serviceConfig = $this->config->get("services", []);
+        $this->container = Container::getInstance($serviceConfig);
+        $this->container->set(Request::class, $this->request);
+        $this->container->set(Response::class, $this->response);
+        // $firstService1 = $this->container->get("FirstService");
+        // $firstService2 = $this->container->get("FirstService");
+        // $firstService1->property = "FirstService1 updated";
+        // var_dump($firstService1->property);
+        // var_dump($firstService2->property);
+        // die;
+    }
+
+    private function initMiddlewares()
+    {
+        $middlewares = $this->config->get("middlewares", []);
+        $this->middlewareClasses = $middlewares;
+    }
+
     private function initRouter()
     {
         $this->router = new Router($this->config->get("routes", []));
@@ -89,59 +121,53 @@ class App
     {
         $this->router->match($this->request);
 
-        var_dump($this->request->attributes->all());die;
-
-        if ($params === false) {
-
-            throw new PageNotFoundException("No route matched for '$path' with method '{$request->method}'");
+        if (!$this->request->attributes->has("_controller")) {
+            $path = $this->request->getPath();
+            $method = $this->request->getMethod();
+            throw new PageNotFoundException("No route matched for '$path' with method '$method'");
         }
 
-        $action = $this->getActionName($params);
-        $controller = $this->getControllerName($params);
+        $_controller = $this->request->attributes->get("_controller");
+        $controller = explode("::", $_controller)[0];
+        $action = explode("::", $_controller)[1];
+        $params = $this->request->attributes->get("_route_params", []);
 
-        $controller_object = $this->container->get($controller);
-
-        $controller_object->setViewer($this->container->get(TemplateViewerInterface::class));
-
-        $controller_object->setResponse($this->container->get(Response::class));
-
+        $controllerObject = $this->container->get($controller);
+        $controllerObject->setViewer($this->container->get(TemplateViewerInterface::class));
+        $controllerObject->setRequest($this->request);
+        $controllerObject->setResponse($this->response);
         $args = $this->getActionArguments($controller, $action, $params);
 
-        $controller_handler = new ControllerRequestHandler(
-            $controller_object,
+        $middlewares = $this->getMiddlewares($params);
+        $controllerRequestHandler = new ControllerRequestHandler(
+            $controllerObject,
             $action,
             $args
         );
-
-        $middleware = $this->getMiddleware($params);
-
-        $middleware_handler = new MiddlewareRequestHandler(
-            $middleware,
-            $controller_handler
+        $requestHandler = new MiddlewareRequestHandler(
+            $middlewares,
+            $controllerRequestHandler
         );
 
-        return $middleware_handler->handle($request);
+        $response = $requestHandler->handle($this->request);
+        $response->send();
     }
 
-    private function getMiddleware(array $params): array
+    private function getMiddlewares(array $params): array
     {
-        if (!array_key_exists("middleware", $params)) {
-
+        if (!array_key_exists("middlewares", $params)) {
             return [];
         }
 
-        $middlewares = explode("|", $params["middlewares"]);
+        $middlewares = $params["middlewares"];
 
         array_walk($middlewares, function (&$middleware) {
 
             if (!array_key_exists($middleware, $this->middlewareClasses)) {
-
                 throw new UnexpectedValueException("Middleware '$middleware' not found in config settings");
             }
-
             $middleware = $this->container->get($this->middlewareClasses[$middleware]);
         });
-
         return $middlewares;
     }
 
@@ -154,8 +180,16 @@ class App
         foreach ($method->getParameters() as $parameter) {
 
             $name = $parameter->getName();
-
-            $args[$name] = $params[$name];
+            if (array_key_exists($name, $params)) {
+                $args[$name] = $params[$name];
+            } else if ($parameter->getType() !== null) {
+                $type = $parameter->getType()->getName();
+                $args[$name] = $this->container->get($type);
+            } else if ($parameter->isDefaultValueAvailable()) {
+                $args[$name] = $parameter->getDefaultValue();
+            } else {
+                throw new UnexpectedValueException("Missing parameter '$name' for action '$action'");
+            }
         }
 
         return $args;

@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Framework;
+namespace Framework\Controller;
 
-abstract class Controller
+use Framework\Http\Request;
+use Framework\Http\Response;
+use Framework\View\TemplateViewerInterface;
+
+abstract class AbstractController
 {
     protected Request $request;
 
@@ -27,7 +31,7 @@ abstract class Controller
         $this->viewer = $viewer;
     }
 
-    protected function view(string $template, array $data = []): Response
+    protected function render(string $template, array $data = []): Response
     {
         $this->response->setBody($this->viewer->render($template, $data));
 
@@ -37,6 +41,13 @@ abstract class Controller
     protected function redirect(string $url): Response
     {
         $this->response->redirect($url);
+
+        return $this->response;
+    }
+
+    protected function json(array $data): Response
+    {
+        $this->response->json($data);
 
         return $this->response;
     }

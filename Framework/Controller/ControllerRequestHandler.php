@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Framework;
+namespace Framework\Controller;
+
+use Framework\Http\Request;
+use Framework\Http\Response;
+use Framework\Http\RequestHandlerInterface;
 
 class ControllerRequestHandler implements RequestHandlerInterface
 {
     public function __construct(
-        private Controller $controller,
+        private AbstractController $controller,
         private string $action,
         private array $args
     ) {
