@@ -1,175 +1,202 @@
 <?php
 
-declare(strict_types=1);
+namespace Framework\Database;
 
-namespace Framework;
+use Exception;
+use ReflectionClass;
 
-use PDO;
-
-
-abstract class Model
+class Model
 {
+    protected $db;
     protected $table;
+    protected $entityClass;
+    protected $assocArrayMode = false;
 
-    protected array $errors = [];
-
-    public function update(string $id, array $data): bool
+    public function __construct($db, $assocArrayMode = false)
     {
-        $this->validate($data);
+        $this->db = $db;
+        $this->assocArrayMode = $assocArrayMode;
+        $this->setTable();
+        $this->setEntityClass();
+    }
 
-        if (!empty($this->errors)) {
-            return false;
+    public function save($data)
+    {
+        $sql = "INSERT INTO $this->table (";
+        foreach ($data as $key => $value) {
+            $sql .= "$key, ";
+        }
+        $sql = rtrim($sql, ', ');
+        $sql .= ') VALUES (';
+        foreach ($data as $key => $value) {
+            $sql .= ":$key, ";
+        }
+        $sql = rtrim($sql, ', ');
+        $sql .= ')';
+        try {
+            $stmt = $this->db->prepare($sql);
+            $res = $stmt->execute($data);
+        } catch (Exception $e) {
+            var_dump($e->getMessage());
+            exit;
+        }
+        if ($res) {
+            return $this->find($this->db->lastInsertId());
+        }
+        return null;
+    }
+
+    public function delete($id)
+    {
+        $sql = "DELETE FROM $this->table WHERE id = :id";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute(['id' => $id]);
+    }
+
+    public function update($id, $data)
+    {
+        $data = array_merge($data, ['id' => $id]);
+        $sql = "UPDATE $this->table SET ";
+        foreach ($data as $key => $value) {
+            $sql .= "$key = :$key, ";
+        }
+        $sql = rtrim($sql, ', ');
+        $sql .= " WHERE id = :id";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($data);
+    }
+
+    public function findAll($asAssocArray = null)
+    {
+        $sql = "SELECT * FROM $this->table";
+        $stmt = $this->db->query($sql);
+        $dbData = $stmt->fetchAll();
+
+        return $this->getFormatedRecords($dbData, $asAssocArray);
+    }
+
+    public function find($id, $assocArrayMode = null)
+    {
+        $sql = "SELECT * FROM $this->table WHERE id = :id";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute(['id' => $id]);
+        $dbData = $stmt->fetch();
+        if ($dbData) {
+            return $this->formatRecord($dbData, $assocArrayMode);
+        }
+        return null;
+    }
+
+    public function findByColumn($column, $value, $assocArrayMode = null, $number = null, $offset = null)
+    {
+        $sql = "SELECT * FROM $this->table WHERE $column = :$column";
+        $sql .= $number ? " LIMIT $number" : '';
+        $sql .= $offset ? " OFFSET $offset" : '';
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$column => $value]);
+        $dbData = $stmt->fetchAll();
+
+        return $this->getFormatedRecords($dbData, $assocArrayMode);
+    }
+
+    public function getOneByColumn($column, $value, $assocArrayMode = null)
+    {
+        return $this->findByColumn($column, $value, $assocArrayMode, 1)[0] ?? null;
+    }
+
+    public function findBy(array $query, $assocArrayMode = null, $number = null, $offset = null)
+    {
+        $sql = "SELECT * FROM $this->table WHERE ";
+
+        $sql .= implode(' AND ', array_map(function ($key) use ($query) {
+            return "$key " . $query[$key]['op'] . " :$key";
+        }, array_keys($query)));
+
+        if ($number) {
+            $sql .= " LIMIT $number";
+        }
+        if ($offset) {
+            $sql .= " OFFSET $offset";
         }
 
-        $sql = "UPDATE {$this->getTable()} ";
+        $stmt = $this->db->prepare($sql);
+        $values = [];
+        foreach ($query as $key => $params) {
+            $values[$key] = $params["value"];
+        }
+        $stmt->execute($values);
+        $dbData = $stmt->fetchAll();
+        return $this->getFormatedRecords($dbData, $assocArrayMode);
+    }
 
-        unset($data["id"]);
+    public function findOneBy(array $query, $assocArrayMode = null)
+    {
+        return $this->findBy($query, $assocArrayMode, 1)[0] ?? null;
+    }
 
-        $assignments = array_keys($data);
+    protected function createEntity($dbData)
+    {
+        return new $this->entityClass($dbData);
+    }
 
-        array_walk($assignments, function (&$value) {
-            $value = "$value = ?";
-        });
-
-        $sql .= " SET " . implode(", ", $assignments);
-
-        $sql .= " WHERE id = ?";
-
-        $conn = $this->database->getConnection();
-
-        $stmt = $conn->prepare($sql);
-
-        $i = 1;
-
-        foreach ($data as $value) {
-
-            $type = match (gettype($value)) {
-                "boolean" => PDO::PARAM_BOOL,
-                "integer" => PDO::PARAM_INT,
-                "NULL" => PDO::PARAM_NULL,
-                default => PDO::PARAM_STR
-            };
-
-            $stmt->bindValue($i++, $value, $type);
+    protected function getFormatedRecords($dbData, $asAssocArray = null)
+    {
+        if (!$dbData) {
+            return [];
         }
 
-        $stmt->bindValue($i, $id, PDO::PARAM_INT);
-
-        return $stmt->execute();
-    }
-
-    protected function validate(array $data): void
-    {
-    }
-
-    public function getInsertID(): string
-    {
-        $conn = $this->database->getConnection();
-
-        return $conn->lastInsertId();
-    }
-
-    protected function addError(string $field, string $message): void
-    {
-        $this->errors[$field] = $message;
-    }
-
-    public function getErrors(): array
-    {
-        return $this->errors;
-    }
-
-    private function getTable(): string
-    {
-        if ($this->table !== null) {
-
-            return $this->table;
+        $entities = [];
+        foreach ($dbData as $data) {
+            $record = $this->formatRecord($data, $asAssocArray);
+            $id = $data['id'];
+            if ($id && !isset($entities[$id])) {
+                // record has not been added to the array yet
+                $entities[$id] = $record;
+            } elseif ($id) {
+                // the index is already taken. we move the current record to the end of the array
+                $entities[] = $entities[$id];
+                $entities[$id] = $record;
+            } else {
+                $entities[] = $record;
+            }
         }
-
-        $parts = explode("\\", $this::class);
-
-        return strtolower(array_pop($parts));
+        return $entities;
     }
 
-    public function __construct(protected Database $database)
+    protected function formatRecord($data, $asAssocArray = null)
     {
-    }
-
-    public function findAll(): array
-    {
-        $pdo = $this->database->getConnection();
-
-        $sql = "SELECT *
-                FROM {$this->getTable()}";
-
-        $stmt = $pdo->query($sql);
-
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
-    }
-
-    public function find(string $id): array|bool
-    {
-        $conn = $this->database->getConnection();
-
-        $sql = "SELECT *
-                FROM {$this->getTable()}
-                WHERE id = :id";
-
-        $stmt = $conn->prepare($sql);
-
-        $stmt->bindValue(":id", $id, PDO::PARAM_INT);
-
-        $stmt->execute();
-
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-
-    public function insert(array $data): bool
-    {
-        $this->validate($data);
-
-        if (!empty($this->errors)) {
-            return false;
+        if ($this->assocArrayMode || $asAssocArray) {
+            return $this->createAssoc($data);
         }
-
-        $columns = implode(", ", array_keys($data));
-        $placeholders = implode(", ", array_fill(0, count($data), "?"));
-
-        $sql = "INSERT INTO {$this->getTable()} ($columns)
-                VALUES ($placeholders)";
-
-        $conn = $this->database->getConnection();
-
-        $stmt = $conn->prepare($sql);
-
-        $i = 1;
-
-        foreach ($data as $value) {
-
-            $type = match (gettype($value)) {
-                "boolean" => PDO::PARAM_BOOL,
-                "integer" => PDO::PARAM_INT,
-                "NULL" => PDO::PARAM_NULL,
-                default => PDO::PARAM_STR
-            };
-
-            $stmt->bindValue($i++, $value, $type);
-        }
-
-        return $stmt->execute();
+        return $this->createEntity($data);
     }
 
-    public function delete(string $id): bool
+    protected function createAssoc($data)
     {
-        $sql = "DELETE FROM {$this->getTable()}
-                WHERE id = :id";
+        $assoc = [];
+        foreach ($data as $key => $value) {
+            if (!is_numeric($key)) {
+                $assoc[$key] = $value;
+            }
+        }
+        return $assoc;
+    }
 
-        $conn = $this->database->getConnection();
+    protected function setTable()
+    {
+        $className = $this->getMainClassName();
+        $table = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $className));
+        $this->table = str_ends_with($table, 'y') ? substr($table, 0, -1) . 'ies' : $table . 's';
+    }
 
-        $stmt = $conn->prepare($sql);
+    protected function setEntityClass()
+    {
+        $this->entityClass = 'entities\\' . $this->getMainClassName();
+    }
 
-        $stmt->bindValue(":id", $id, PDO::PARAM_INT);
-
-        return $stmt->execute();
+    protected function getMainClassName()
+    {
+        $className = (new ReflectionClass($this))->getShortName();
+        return str_replace('Model', '', $className);
     }
 }

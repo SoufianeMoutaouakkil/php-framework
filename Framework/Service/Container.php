@@ -16,6 +16,8 @@ class Container
     const TYPE_SERVICE = "service";
     const TYPE_CONTROLLER = "controller";
     const TYPE_MIDDLEWARE = "middleware";
+    const TYPE_MODEL = "model";
+    const TYPE_ENTITY = "entity";
 
     protected function __construct(array $config)
     {
@@ -23,6 +25,8 @@ class Container
         $this->servicesAutodiscovery();
         $this->controllersAutodiscovery();
         $this->middlewaresAutodiscovery();
+        $this->modelsAutodiscovery();
+        $this->entitiesAutodiscovery();
         // var_dump($this->config);die;
     }
 
@@ -80,6 +84,22 @@ class Container
         $controllersPath = $this->getControllersPath();
         if (is_dir($controllersPath)) {
             $this->addFolder($controllersPath, self::TYPE_CONTROLLER, $force);
+        }
+    }
+
+    private function modelsAutodiscovery(bool $force = false): void
+    {
+        $modelsPath = $this->getModelsPath();
+        if (is_dir($modelsPath)) {
+            $this->addFolder($modelsPath, self::TYPE_MODEL, $force);
+        }
+    }
+
+    private function entitiesAutodiscovery(bool $force = false): void
+    {
+        $entitiesPath = $this->getEntitiesPath();
+        if (is_dir($entitiesPath)) {
+            $this->addFolder($entitiesPath, self::TYPE_ENTITY, $force);
         }
     }
 
@@ -184,6 +204,15 @@ class Container
         return str_replace('\\', '/', ROOT_PATH . "/src/Middlewares");
     }
 
+    private function getModelsPath()
+    {
+        return str_replace('\\', '/', ROOT_PATH . "/src/Models");
+    }
+    private function getEntitiesPath()
+    {
+        return str_replace('\\', '/', ROOT_PATH . "/src/Entities");
+    }
+
     private function getTypeData($type)
     {
         switch ($type) {
@@ -193,6 +222,10 @@ class Container
                 return ['App\\Controllers', $this->getControllersPath()];
             case self::TYPE_MIDDLEWARE:
                 return ['App\\Middlewares', $this->getMiddlewaresPath()];
+            case self::TYPE_MODEL:
+                return ['App\\Models', $this->getModelsPath()];
+            case self::TYPE_ENTITY:
+                return ['App\\Entities', $this->getEntitiesPath()];
             default:
                 throw new Exception("Invalid service type '$type'");
         }
