@@ -8,12 +8,12 @@ class UserController extends AbstractController
 {
     public function create()
     {
-        return "User created";
+        return $this->json(["message" => "User created"]);
     }
 
     public function store()
     {
-        return "User stored";
+        return $this->json(["message" => "User stored"]);
     }
     public function get($id)
     {
@@ -21,6 +21,6 @@ class UserController extends AbstractController
     }
     public function update()
     {
-        return "User updated";
+        return $this->json(["message" => "User updated"]);
     }
 }
