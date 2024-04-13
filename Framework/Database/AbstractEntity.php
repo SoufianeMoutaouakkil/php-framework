@@ -2,7 +2,7 @@
 
 namespace Framework\Database;
 
-abstract class Entity
+abstract class AbstractEntity
 {
     protected $_errors = [];
 

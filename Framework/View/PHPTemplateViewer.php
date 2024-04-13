@@ -12,7 +12,7 @@ class PHPTemplateViewer implements TemplateViewerInterface
 
         ob_start();
 
-        require_once dirname(__DIR__, 2) . "/views/$template";
+        require_once ROOT_PATH . "/src/Views/" . $template . ".php";
 
         return ob_get_clean();
     }

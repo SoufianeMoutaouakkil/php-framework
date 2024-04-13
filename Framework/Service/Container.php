@@ -175,7 +175,16 @@ class Container
             $constructor = $reflection->getConstructor();
             if ($constructor) {
                 foreach ($constructor->getParameters() as $parameter) {
-                    $arguments[] = $this->get($parameter->getType()->getName(), $className);
+                    $type = $parameter->getType();
+                    if ($type !== null) {
+                        $arguments[] = $this->get($parameter->getType()->getName(), $className);
+                    } else if ($parameter->isDefaultValueAvailable()) {
+                        $arguments[] = $parameter->getDefaultValue();
+                    } else {
+                        throw new Exception(
+                            "Missing parameter '{$parameter->getName()}' for class '$className'"
+                        );
+                    }
                 }
             }
         }

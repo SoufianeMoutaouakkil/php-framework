@@ -5,19 +5,24 @@ namespace Framework\Database;
 use Exception;
 use ReflectionClass;
 
-abstract class Model
+abstract class AbstractModel
 {
-    protected $db;
+    protected $dbConnection;
     protected $table;
     protected $entityClass;
     protected $assocArrayMode = false;
 
-    public function __construct($db, $assocArrayMode = false)
+    public function __construct(DatabaseInterface $db, $assocArrayMode = null)
     {
-        $this->db = $db;
+        $this->dbConnection = $db->getConnection();
         $this->assocArrayMode = $assocArrayMode;
         $this->setTable();
         $this->setEntityClass();
+    }
+
+    public function setAssocArrayMode(bool $assocArrayMode)
+    {
+        $this->assocArrayMode = $assocArrayMode;
     }
 
     public function save($data)
@@ -34,14 +39,14 @@ abstract class Model
         $sql = rtrim($sql, ', ');
         $sql .= ')';
         try {
-            $stmt = $this->db->prepare($sql);
+            $stmt = $this->dbConnection->prepare($sql);
             $res = $stmt->execute($data);
         } catch (Exception $e) {
             var_dump($e->getMessage());
             exit;
         }
         if ($res) {
-            return $this->find($this->db->lastInsertId());
+            return $this->find($this->dbConnection->lastInsertId());
         }
         return null;
     }
@@ -49,7 +54,7 @@ abstract class Model
     public function delete($id)
     {
         $sql = "DELETE FROM $this->table WHERE id = :id";
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->dbConnection->prepare($sql);
         return $stmt->execute(['id' => $id]);
     }
 
@@ -62,7 +67,7 @@ abstract class Model
         }
         $sql = rtrim($sql, ', ');
         $sql .= " WHERE id = :id";
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->dbConnection->prepare($sql);
         return $stmt->execute($data);
     }
 
@@ -101,7 +106,7 @@ abstract class Model
             $sql .= " OFFSET $offset";
         }
 
-        $stmt = $this->db->prepare($sql);
+        $stmt = $this->dbConnection->prepare($sql);
         $values = [];
         foreach ($query as $key => $params) {
             $values[$key] = $params["value"];
@@ -204,7 +209,7 @@ abstract class Model
 
     protected function setEntityClass()
     {
-        $this->entityClass = 'entities\\' . $this->getMainClassName();
+        $this->entityClass = 'App\\Entities\\' . $this->getMainClassName();
     }
 
     protected function getMainClassName()
