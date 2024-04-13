@@ -5,7 +5,7 @@ namespace Framework\Database;
 use Exception;
 use ReflectionClass;
 
-class Model
+abstract class Model
 {
     protected $db;
     protected $table;
@@ -66,51 +66,33 @@ class Model
         return $stmt->execute($data);
     }
 
-    public function findAll($asAssocArray = null)
+    public function findByQuery(array $query, $assocArrayMode = null, $number = null, $offset = null)
     {
         $sql = "SELECT * FROM $this->table";
-        $stmt = $this->db->query($sql);
-        $dbData = $stmt->fetchAll();
 
-        return $this->getFormatedRecords($dbData, $asAssocArray);
-    }
+        if (!empty($query)) {
+            $sql .= " WHERE ";
 
-    public function find($id, $assocArrayMode = null)
-    {
-        $sql = "SELECT * FROM $this->table WHERE id = :id";
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute(['id' => $id]);
-        $dbData = $stmt->fetch();
-        if ($dbData) {
-            return $this->formatRecord($dbData, $assocArrayMode);
+            $sql .= implode(' AND ', array_map(function ($key) use ($query) {
+                $cond = "";
+                // add the key to the condition
+                if (isset($query[$key]['keyFn'])) {
+                    $cond = "{$query[$key]['keyFn']}($key";
+                    if (isset($query[$key]['keyFnArgs'])) {
+                        $cond = ', ';
+                        $cond .= implode(', ', $query[$key]['keyFnArgs']);
+                    }
+                    $cond .= ') ';
+                } else {
+                    $cond = "$key ";
+                }
+                // add the operator to the condition
+                $cond = isset($query[$key]['op']) ? $cond . $query[$key]['op'] : $cond . '=';
+                // add the key to the condition
+                $cond .= " :$key";
+                return $cond;
+            }, array_keys($query)));
         }
-        return null;
-    }
-
-    public function findByColumn($column, $value, $assocArrayMode = null, $number = null, $offset = null)
-    {
-        $sql = "SELECT * FROM $this->table WHERE $column = :$column";
-        $sql .= $number ? " LIMIT $number" : '';
-        $sql .= $offset ? " OFFSET $offset" : '';
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$column => $value]);
-        $dbData = $stmt->fetchAll();
-
-        return $this->getFormatedRecords($dbData, $assocArrayMode);
-    }
-
-    public function getOneByColumn($column, $value, $assocArrayMode = null)
-    {
-        return $this->findByColumn($column, $value, $assocArrayMode, 1)[0] ?? null;
-    }
-
-    public function findBy(array $query, $assocArrayMode = null, $number = null, $offset = null)
-    {
-        $sql = "SELECT * FROM $this->table WHERE ";
-
-        $sql .= implode(' AND ', array_map(function ($key) use ($query) {
-            return "$key " . $query[$key]['op'] . " :$key";
-        }, array_keys($query)));
 
         if ($number) {
             $sql .= " LIMIT $number";
@@ -124,14 +106,45 @@ class Model
         foreach ($query as $key => $params) {
             $values[$key] = $params["value"];
         }
-        $stmt->execute($values);
+
+        if (empty($values)) {
+            $stmt->execute();
+        } else {
+            $stmt->execute($values);
+        }
+
         $dbData = $stmt->fetchAll();
         return $this->getFormatedRecords($dbData, $assocArrayMode);
     }
 
-    public function findOneBy(array $query, $assocArrayMode = null)
+    public function findOneByQuery(array $query, $assocArrayMode = null)
     {
-        return $this->findBy($query, $assocArrayMode, 1)[0] ?? null;
+        return $this->findByQuery($query, $assocArrayMode, 1)[0] ?? null;
+    }
+
+    public function findAll($asAssocArray = null)
+    {
+        return $this->findByQuery([], $asAssocArray);
+    }
+
+    public function find($id, $assocArrayMode = null)
+    {
+        return $this->findByQuery(['id' => ['value' => $id]], $assocArrayMode, 1)[0] ?? null;
+    }
+
+    public function findByColumn($column, $value, $assocArrayMode = null, $number = null, $offset = null)
+    {
+        return $this->findByQuery(
+            [$column => ['value' => $value]],
+            $assocArrayMode,
+            $number,
+            $offset
+        );
+    }
+
+    public function getOneByColumn($column, $value, $assocArrayMode = null)
+    {
+        return $this->findByColumn($column, $value, $assocArrayMode, 1)[0] ?? null;
     }
 
     protected function createEntity($dbData)
