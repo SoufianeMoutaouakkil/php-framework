@@ -45,9 +45,17 @@ abstract class AbstractController
         return $this->response;
     }
 
-    protected function json(array $data): Response
+    protected function json(array $data, int $status = Response::HTTP_OK): Response
     {
+        $this->response->setStatusCode($status);
         $this->response->json($data);
+
+        return $this->response;
+    }
+
+    protected function sendFile(string $file): Response
+    {
+        $this->response->sendFile($file);
 
         return $this->response;
     }

@@ -6,6 +6,16 @@ namespace Framework\Http;
 
 class Response
 {
+    const HTTP_OK = 200;
+    const HTTP_CREATED = 201;
+    const HTTP_NO_CONTENT = 204;
+    const HTTP_BAD_REQUEST = 400;
+    const HTTP_UNAUTHORIZED = 401;
+    const HTTP_FORBIDDEN = 403;
+    const HTTP_NOT_FOUND = 404;
+    const HTTP_METHOD_NOT_ALLOWED = 405;
+    const HTTP_INTERNAL_SERVER_ERROR = 500;
+
     private string $body = "";
 
     private array $headers = [];
@@ -16,7 +26,7 @@ class Response
     {
         $this->statusCode = $code;
     }
-    
+
     public function redirect(string $url): void
     {
         $this->addHeader("Location", $url);
@@ -38,7 +48,7 @@ class Response
     {
         $this->body .= $body;
     }
-    
+
     public function getBody(): string
     {
         return $this->body;
@@ -48,6 +58,13 @@ class Response
     {
         $this->addHeader("Content-Type", "application/json");
         $this->setBody(json_encode($data));
+    }
+
+    public function sendFile(string $file): void
+    {
+        $this->addHeader("Content-Type", mime_content_type($file));
+        $this->addHeader("Content-Disposition", "attachment; filename=" . basename($file));
+        $this->setBody(file_get_contents($file));
     }
 
     public function send(): void

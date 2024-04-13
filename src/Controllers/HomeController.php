@@ -10,12 +10,12 @@ class HomeController extends AbstractController
 {
     public function index(RoleModel $roleModel)
     {
-        // // example of using render with objects as return of Model
-        // $roles = $roleModel->findAll();
-        // return $this->render("home/index", [
-        //     "title" => "Home",
-        //     "roles" => $roles
-        // ]);
+        // example of using render with objects as return of Model
+        $roles = $roleModel->findAll();
+        return $this->render("home/index", [
+            "title" => "Home",
+            "roles" => $roles
+        ]);
         
         // // example of using json with array as return of Model
         // $roles = $roleModel->findAll(true);
@@ -24,7 +24,7 @@ class HomeController extends AbstractController
         //     "roles" => $roles
         // ]);
 
-        // example of using redirect
-        return $this->redirect("/users");
+        // // example of using redirect
+        // return $this->redirect("/users");
     }
 }

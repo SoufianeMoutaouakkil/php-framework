@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? "My App" ?></title>
+    <script src="/js/home/index.js"></script>
 </head>
 
 <body>
@@ -15,6 +16,10 @@
             <li><?= $role->getNom() ?></li>
         <?php endforeach; ?>
     </ul>
+    <div>
+        <input type="text" id="ext" placeholder="Enter file extension">
+        <button id="btn">Download</button>
+    </div>
 </body>
 
 </html>
